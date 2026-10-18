@@ -1,0 +1,168 @@
+@startuml PcBuilderFacade
+' Open in VS Code with the "PlantUML" extension (jebbs.plantuml): Alt+D to preview,
+' right click -> "Export Current Diagram" -> png/svg to get the picture for the report.
+' "smetana" is the built-in layout engine, so Graphviz does not have to be installed.
+!pragma layout smetana
+
+title PC Builder - Facade pattern
+
+skinparam classAttributeIconSize 0
+skinparam packageStyle rectangle
+skinparam shadowing false
+hide empty members
+
+package "client" {
+  class Main <<Client>> {
+    + {static} main(args: String[])
+  }
+  class ConsoleApp
+  class DemoScript
+  class ConsolePrinter
+  class AdvancedClientDemo <<advanced client>> {
+    + {static} main(args: String[])
+  }
+}
+
+package "facade" {
+  class PcBuildFacade <<Facade>> {
+    - catalog: ComponentCatalog
+    - inventory: Inventory
+    - planner: ConfigurationPlanner
+    - compatibilityChecker: CompatibilityChecker
+    - workshop: AssemblyWorkshop
+    - stressTester: StressTester
+    - priceCalculator: PriceCalculator
+    + buildGamingPc(budgetKzt: int): BuildSummary
+    + buildOfficePc(budgetKzt: int): BuildSummary
+    + buildWorkstationPc(budgetKzt: int): BuildSummary
+    + buildCustomPc(partIds: List<String>): BuildSummary
+    + listAvailableParts(): List<PartOffer>
+    + unitsInStock(partId: String): int
+    - orderBuild(config: PcConfiguration): BuildSummary
+  }
+  class PcUpgradeFacade <<Facade>> {
+    - catalog: ComponentCatalog
+    - compatibilityChecker: CompatibilityChecker
+    - powerCalculator: PowerCalculator
+    + checkUpgrade(currentPartIds: List<String>, newPartId: String): UpgradeAdvice
+  }
+  class BuildSummary <<record>>
+  class PartOffer <<record>>
+  class UpgradeAdvice <<record>>
+  class PcServiceException
+}
+
+package "subsystem" {
+  class ComponentCatalog {
+    + findById(id: String): Component
+    + findAllById(ids: List<String>): List<Component>
+    + findMostExpensiveWithin(type, maxPrice, requirement): Optional<T>
+    + findCheapest(type, requirement): Optional<T>
+  }
+  class ConfigurationPlanner {
+    + plan(profile: BuildProfile, budget: int): PcConfiguration
+  }
+  class CompatibilityChecker {
+    + verify(config: PcConfiguration)
+    + findProblems(config: PcConfiguration): List<String>
+  }
+  class PowerCalculator {
+    + heatOutputWatts(cpu: Cpu, gpu: Gpu): int
+    + recommendedPsuWatts(cpu: Cpu, gpu: Gpu): int
+  }
+  class Inventory {
+    + reserve(parts: List<Component>)
+    + release(parts: List<Component>)
+    + unitsAvailable(id: String): int
+  }
+  class AssemblyWorkshop {
+    + assemble(config: PcConfiguration): Computer
+  }
+  class StressTester {
+    + run(computer: Computer): StressTestReport
+    + certify(computer: Computer): StressTestReport
+  }
+  class PriceCalculator {
+    + quote(config: PcConfiguration): PriceQuote
+  }
+  enum BuildProfile {
+    GAMING
+    OFFICE
+    WORKSTATION
+  }
+  class PcConfiguration <<record>> {
+    + {static} fromParts(parts: List<Component>): PcConfiguration
+    + withReplaced(newPart: Component): PcConfiguration
+    + parts(): List<Component>
+  }
+  interface Component {
+    + id(): String
+    + name(): String
+    + price(): int
+    + type(): ComponentType
+  }
+  class Cpu <<record>>
+  class Motherboard <<record>>
+  class Ram <<record>>
+  class Gpu <<record>>
+  class Storage <<record>>
+  class PowerSupply <<record>>
+  class PcCase <<record>>
+  class Computer <<record>>
+  class StressTestReport <<record>>
+  class PriceQuote <<record>>
+  abstract class SubsystemException
+}
+
+' --- client side: Main knows only the facades
+Main --> ConsoleApp
+Main --> DemoScript
+ConsoleApp --> PcBuildFacade
+ConsoleApp --> PcUpgradeFacade
+ConsoleApp --> ConsolePrinter
+DemoScript --> PcBuildFacade
+DemoScript --> PcUpgradeFacade
+DemoScript --> ConsolePrinter
+AdvancedClientDemo ..> ComponentCatalog : bypasses facade
+AdvancedClientDemo ..> CompatibilityChecker : bypasses facade
+AdvancedClientDemo ..> PowerCalculator : bypasses facade
+
+' --- facades coordinate the subsystem
+PcBuildFacade *-- ConfigurationPlanner
+PcBuildFacade *-- CompatibilityChecker
+PcBuildFacade *-- AssemblyWorkshop
+PcBuildFacade *-- StressTester
+PcBuildFacade *-- PriceCalculator
+PcBuildFacade o-- ComponentCatalog
+PcBuildFacade o-- Inventory
+PcBuildFacade ..> BuildSummary : creates
+PcBuildFacade ..> PartOffer : creates
+PcBuildFacade ..> PcServiceException : throws
+
+PcUpgradeFacade o-- ComponentCatalog
+PcUpgradeFacade *-- CompatibilityChecker
+PcUpgradeFacade *-- PowerCalculator
+PcUpgradeFacade ..> UpgradeAdvice : creates
+PcUpgradeFacade ..> PcServiceException : throws
+
+' --- collaborations inside the subsystem (no arrows back to the facade!)
+ConfigurationPlanner --> ComponentCatalog
+ConfigurationPlanner --> PowerCalculator
+ConfigurationPlanner ..> BuildProfile
+CompatibilityChecker --> PowerCalculator
+StressTester --> PowerCalculator
+ComponentCatalog o-- "*" Component
+PcConfiguration o-- "7" Component
+Component <|.. Cpu
+Component <|.. Motherboard
+Component <|.. Ram
+Component <|.. Gpu
+Component <|.. Storage
+Component <|.. PowerSupply
+Component <|.. PcCase
+AssemblyWorkshop ..> Computer : creates
+Computer --> PcConfiguration
+StressTester ..> StressTestReport : creates
+PriceCalculator ..> PriceQuote : creates
+
+@enduml
